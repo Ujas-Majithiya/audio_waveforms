@@ -1,3 +1,4 @@
+import 'package:audio_waveforms/src/base/platform_streams.dart';
 import 'package:audio_waveforms/src/base/player_wave_style.dart';
 import 'package:audio_waveforms/src/painters/player_wave_painter.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +46,8 @@ class AudioFileWaveforms extends StatefulWidget {
   final Clip clipBehavior;
 
   ///Generate waveforms from audio file. You play those audio file using [PlayerController].
-  ///When you play the audio file, another waveforms will drawn on top of it show
+  ///When you play the audio file, another waveform
+  /// will drawn on top of it to show
   /// how much audio has been played and how much is left.
   ///
   /// With seeking gesture enabled, playing audio can be seeked to any postion using
@@ -84,10 +86,23 @@ class _AudioFileWaveformsState extends State<AudioFileWaveforms>
 
   //TODO: update this in PR
   bool showSeekLine = false;
+  late List<int> _waveData;
+  late EdgeInsets? margin;
+  late EdgeInsets? padding;
+  late BoxDecoration? decoration;
+  late Color? backgroundColor;
+  late Duration? animationDuration;
+  late Curve? animationCurve;
+  late double? density;
+  late Clip? clipBehavior;
+  late PlayerWaveStyle? playerWaveStyle;
+
 
   @override
   void initState() {
     super.initState();
+    _initialiseVariables();
+    showSeekLine = widget.playerWaveStyle.showSeeker;
     animationController = AnimationController(
       vsync: this,
       duration: widget.animationDuration,
@@ -102,16 +117,16 @@ class _AudioFileWaveformsState extends State<AudioFileWaveforms>
     widget.playerController.addListener(() {
       if (widget.playerController.playerState == PlayerState.playing) {
         animationController.forward();
-        if (!widget.playerController.durationStreamController.hasListener) {
-          widget.playerController.durationStreamController.stream
-              .listen((event) {
-            _currentDuration = event;
-            showSeekLine = widget.playerWaveStyle.showSeeker;
-            if (mounted) setState(() {});
-          });
-        }
+        widget.playerController.removeListener(() { });
+        print('here');
       }
-      if (mounted) setState(() {});
+    });
+    PlatformStreams.instance.durationStream.listen((event) {
+      if (widget.playerController.playerKey == event.playerKey) {
+        _currentDuration = event.duration;
+        if (mounted) setState(() {});
+
+      }
     });
   }
 
@@ -119,7 +134,6 @@ class _AudioFileWaveformsState extends State<AudioFileWaveforms>
   void dispose() {
     animation.removeListener(() {});
     animationController.dispose();
-    widget.playerController.removeListener(() {});
     super.dispose();
   }
 
@@ -128,6 +142,7 @@ class _AudioFileWaveformsState extends State<AudioFileWaveforms>
 
   @override
   Widget build(BuildContext context) {
+
     return Container(
       padding: widget.padding,
       margin: widget.margin,
@@ -142,8 +157,9 @@ class _AudioFileWaveformsState extends State<AudioFileWaveforms>
         child: RepaintBoundary(
           child: CustomPaint(
             isComplex: true,
+            //willChange: true,
             painter: FileWaveformsPainter(
-              waveData: widget.playerController.bufferData!.toList(),
+              waveData: _waveData,
               multiplier: _multiplier,
               density: widget.density,
               maxDuration: widget.playerController.maxDuration,
@@ -187,5 +203,18 @@ class _AudioFileWaveformsState extends State<AudioFileWaveforms>
     widget.playerController.seekTo(seekPostion.toInt());
     _currentSeekPositon = details.globalPosition.dx;
     setState(() {});
+  }
+
+  void _initialiseVariables(){
+    _waveData = widget.playerController.bufferData?.toList() ?? [];
+    margin = widget.margin;
+    padding = widget.padding;
+    decoration = widget.decoration;
+    backgroundColor = widget.backgroundColor;
+    animationDuration = widget.animationDuration;
+    animationCurve = widget.animationCurve;
+    density = widget.density;
+    clipBehavior = widget.clipBehavior;
+    playerWaveStyle = widget.playerWaveStyle;
   }
 }

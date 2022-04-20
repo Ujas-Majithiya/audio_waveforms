@@ -3,120 +3,132 @@ import Foundation
 import AVKit
 
 
-
-class AudioPlayer : NSObject, FlutterStreamHandler {
-    static let sharedInstance = AudioPlayer()
-    private var player: AVPlayer?
-    private var sink: FlutterEventSink?
-    private var item: AVPlayerItem?
-    private var url: URL?
-    private var observerToken: Any?
-    private var didAudioEndObserver: Any?
+//https://stackoverflow.com/questions/36865233/get-avaudioplayer-to-play-multiple-sounds-at-a-time
+class AudioPlayer : NSObject, AVAudioPlayerDelegate {
+    
     private var seekToStart = true
+    private var timer : Timer?
+    private var audioPlayers: [String:AVAudioPlayer] = [:]
+    var plugin : SwiftAudioWaveformsPlugin
     
-    
-    func preparePlayer(path: String?, volume: Double?,result:  @escaping FlutterResult){
-        if(!(path ?? "").isEmpty){
-            url = URL.init(fileURLWithPath: path!)
-            item = AVPlayerItem(url: url!)
-            //player?.replaceCurrentItem(with: <#T##AVPlayerItem?#>)
-            player = AVPlayer(playerItem: item!)
-            player?.volume = Float(volume ?? 1.0)
-            result(true)
-        } else {
-            result(FlutterError(code: "", message: "Path to file can't be empty or null", details: nil))
-        }
+    init(plugin : SwiftAudioWaveformsPlugin){
+        self.plugin = plugin
     }
     
-    func startPlayer(result:  @escaping FlutterResult , seekToStart: Bool){
-        self.seekToStart = seekToStart
-        didAudioEndObserver = NotificationCenter.default.addObserver(self, selector: #selector(playerDidFinishPlaying), name: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: player?.currentItem)
+    
+    func preparePlayer(path: String?,volume: Double?,key: String?,result:  @escaping FlutterResult){
+        if(key != nil){
+            let playerExists = audioPlayers[key!] != nil
+            if(!(path ?? "").isEmpty){
+                let audioUrl = URL.init(fileURLWithPath: path!)
+                if(playerExists){
+                    result(true)
+                }else{
+                    let player = try! AVAudioPlayer(contentsOf: audioUrl)
+                    audioPlayers.updateValue(player, forKey: key!)
+                    player.prepareToPlay()
+                    player.volume = Float(volume ?? 1.0)
+                    result(true)
+                }
+            }else {
+                result(FlutterError(code: "", message: "Audio file path can't be empty or null", details: nil))
+            }
+        }else {
+            result(false)
+        }
         
-        if(player?.status == .readyToPlay){
-            player?.play()
+        
+    }
+    
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer,
+                                              successfully flag: Bool){
+        player.currentTime = player.duration
+    }
+    
+    func startPlyer(key: String?,result:  @escaping FlutterResult){
+        if(key != nil){
+            audioPlayers[key!]?.play()
+            audioPlayers[key!]?.delegate = self
+            startListening(key: key!)
             result(true)
-        } else{
+        }
+        else {
             result(false)
         }
     }
     
+    func pausePlayer(key: String?,result:  @escaping FlutterResult){
+        if(key != nil){
+            stopListening()
+            audioPlayers[key!]?.pause()
+            result(true)
+        }
+        else {
+            result(false)
+        }
+    }
+    
+    func stopPlayer(key: String?,result:  @escaping FlutterResult){
+        if(key != nil){
+            stopListening()
+            audioPlayers[key!]?.stop()
+            result(true)
+        }
+        else {
+            result(false)
+        }
+    }
+    
+    //TODO:
     @objc func playerDidFinishPlaying(playerItem: AVPlayerItem){
-        let milliSeconds = (player?.currentItem?.duration.seconds ?? 0) * 1000
-        sink!(Int(milliSeconds))
         if(seekToStart){
-            player?.seek(to: CMTime(seconds: 0, preferredTimescale: 1))
         }
         
     }
     
-    func getDuration(_ type:DurationType,_ result:  @escaping FlutterResult) throws {
-        if type == .Current {
-            let seconds = player?.currentItem?.currentTime().seconds
-            guard !(seconds == nil || seconds!.isNaN || seconds!.isInfinite) else {
-                throw ThrowError.runtimeError("Error")
+    func getDuration(key: String?,_ type:DurationType,_ result:  @escaping FlutterResult) throws {
+        if(key != nil){
+            if type == .Current {
+                let ms = (audioPlayers[key!]?.currentTime ?? 0) * 1000
+                result(Int(ms))
+            }else{
+                let ms = (audioPlayers[key!]?.duration ?? 0) * 1000
+                result(Int(ms))
             }
-            let milliSeconds = (seconds ?? 0) * 1000
-            result(Int(milliSeconds))
         }else{
-            let seconds = player?.currentItem?.asset.duration.seconds
-            guard !(seconds == nil || seconds!.isNaN || seconds!.isInfinite) else {
-                throw ThrowError.runtimeError("Error")
-            }
-            let milliSeconds = (seconds ?? 0) * 1000
-            result(Int(milliSeconds))
+            result(false)
         }
+        
     }
     
-    func pausePlayer(_ result:  @escaping FlutterResult){
-        player?.pause()
-        result(true)
-    }
-    
-    func stopPlayer(_ result:  @escaping FlutterResult){
-        player?.replaceCurrentItem(with: nil)
-        result(true)
-    }
-    
-    func setVolume(_ volume: Double?,_ result : @escaping FlutterResult) {
-        if(volume != nil){
-            player?.volume = Float(volume!)
+    func setVolume(key: String?,_ volume: Double?,_ result : @escaping FlutterResult) {
+        if(key != nil){
+            audioPlayers[key!]?.volume = Float(volume ?? 1.0)
             result(true)
         }
-        result(false)
-    }
-    
-    func seekTo(_ time: Int?,_ result : @escaping FlutterResult) {
-        if(time != nil){
-            player?.seek(to: CMTime(seconds: Double(time!/1000), preferredTimescale: 1))
-            result(true)
-        } else {
+        else{
             result(false)
         }
     }
     
-    func startListening(){
-        let interval = CMTimeMakeWithSeconds(0.2, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        observerToken = player?.addPeriodicTimeObserver(forInterval: interval, queue: .global(), using: {[weak self] time in
-            let milliSeconds = (self?.player?.currentItem?.currentTime().seconds ?? 0) * 1000
-            self?.sink!(Int(milliSeconds))
+    func seekTo(key: String?,_ time: Int?,_ result : @escaping FlutterResult) {
+        if(key != nil){
+            audioPlayers[key!]?.currentTime = Double(time!/1000)
+            result(true)
+        }else{
+            result(false)
+        }
+        
+    }
+    
+    func startListening(key: String){
+        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true, block: {_ in
+            let ms = (self.audioPlayers[key]?.currentTime ?? 0) * 1000
+            self.plugin.onCurrentDuration(duration: Int(ms),key: key)
         })
     }
     
-    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        sink = events
-        startListening()
-        return nil
-    }
-    
-    func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        if(observerToken != nil){
-            player?.removeTimeObserver(observerToken!)
-        }
-        if(didAudioEndObserver != nil){
-            NotificationCenter.default.removeObserver(didAudioEndObserver!)
-        }
-        sink = nil
-       // player?.replaceCurrentItem(with: nil)
-        return nil
+    func stopListening(){
+        timer?.invalidate()
     }
 }

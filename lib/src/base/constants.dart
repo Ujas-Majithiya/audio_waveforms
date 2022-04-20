@@ -28,6 +28,9 @@ class Constants {
   static const String durationType = "durationType";
   static const String seekToStart = "seekToStart";
   static const String durationEventChannel = "durationEventChannel";
+  static const String playerKey = "playerKey";
+  static const String current = "current";
+  static const String onCurrentDuration = "onCurrentDuration";
 
   static const int byteSize = 8;
 }

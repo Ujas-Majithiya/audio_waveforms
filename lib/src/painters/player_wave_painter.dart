@@ -107,9 +107,11 @@ class FileWaveformsPainter extends CustomPainter {
     int drawBarCount;
     int byte;
     for (int i = 0; i < samplesCount; i++) {
+
       if (i != nextBarNum) {
         continue;
       }
+
       drawBarCount = 0;
       lastBarNum = nextBarNum;
 

@@ -27,7 +27,7 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> {
+class _HomeState extends State<Home> with WidgetsBindingObserver{
   late final RecorderController recorderController;
   late final PlayerController playerController;
   late final PlayerController playerController2;
@@ -44,23 +44,9 @@ class _HomeState extends State<Home> {
     recorderController = RecorderController()
       ..encoder = Encoder.aac
       ..sampleRate = 16000;
-    playerController2 = PlayerController()
-      ..addListener(() {
-        if (playerController2.playerState == PlayerState.playing) {
-          isPlaying2 = true;
-        } else {
-          isPlaying2 = false;
-        }
-        if (mounted) setState(() {});
-      });
+    playerController2 = PlayerController();
     playerController = PlayerController()
-      ..addListener(() {
-        if (playerController.playerState == PlayerState.playing) {
-          isPlaying = true;
-        } else {
-          isPlaying = false;
-        }
-        if (mounted) setState(() {});
+      ..addListener(() {if (mounted) setState(() {});
       });
     _getDir();
     _pickFile();
@@ -74,7 +60,7 @@ class _HomeState extends State<Home> {
   }
 
   void _pickFile() async {
-    await Future.delayed(const Duration(seconds: 2)).whenComplete(() async {
+    await Future.delayed(const Duration(seconds: 3)).whenComplete(() async {
       FilePickerResult? result = await FilePicker.platform.pickFiles();
       if (result != null) {
         musicFile = result.files.single.path;
@@ -86,7 +72,7 @@ class _HomeState extends State<Home> {
   }
 
   void _pickFile2() async {
-    await Future.delayed(const Duration(seconds: 2)).whenComplete(() async {
+    await Future.delayed(const Duration(seconds: 0)).whenComplete(() async {
       FilePickerResult? result = await FilePicker.platform.pickFiles();
       if (result != null) {
         musicFile2 = result.files.single.path;
@@ -95,16 +81,25 @@ class _HomeState extends State<Home> {
         print("File not picked");
       }
     });
+    setState(() {});
   }
 
   @override
   void dispose() {
-    print('here');
     recorderController.disposeFunc();
     playerController.disposeFunc();
     playerController2.disposeFunc();
-
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if(state == AppLifecycleState.detached){
+      recorderController.disposeFunc();
+      playerController.disposeFunc();
+      playerController2.disposeFunc();
+    }
+    super.didChangeAppLifecycleState(state);
   }
 
   @override
@@ -128,16 +123,17 @@ class _HomeState extends State<Home> {
               WaveBubble(
                 playerController: playerController,
                 onTap: () async {
-                  if(playerController2.playerState == PlayerState.playing){
-                    playerController2.stopPlayer();
-                  }
+                  // if (playerController2.playerState == PlayerState.playing) {
+                  //    playerController2.pausePlayer();
+                  // }
                   playerController.playerState == PlayerState.playing
                       ? playerController.pausePlayer()
                       : playerController.playerState == PlayerState.paused
-                      ? playerController.resumePlayer()
-                      : playerController.startPlayer();
-                }
-                    ,
+                          ? playerController.resumePlayer()
+                          : playerController.playerState == PlayerState.resumed
+                              ? playerController.pausePlayer()
+                              : playerController.startPlayer();
+                },
               ),
               const ChatBubble(
                   text: 'That was cool, hear this!', isSender: true),
@@ -145,19 +141,20 @@ class _HomeState extends State<Home> {
             if (playerController2.playerState != PlayerState.stopped) ...[
               WaveBubble(
                 playerController: playerController2,
+                isSender: true,
                 onTap: () async {
-                  if(playerController.playerState == PlayerState.playing){
-                    playerController.stopPlayer();
-                  }
+                  // if (playerController.playerState == PlayerState.playing) {
+                  //   playerController.pausePlayer();
+                  // }
                   playerController2.playerState == PlayerState.playing
                       ? playerController2.pausePlayer()
                       : playerController2.playerState == PlayerState.paused
                           ? playerController2.resumePlayer()
-                          : playerController2.startPlayer();
+                          : playerController2.playerState == PlayerState.resumed
+                              ? playerController2.pausePlayer()
+                              : playerController2.startPlayer();
                 },
               ),
-              const ChatBubble(
-                  text: 'That was cool, hear this!', isSender: true),
             ],
             const Spacer(),
             Row(

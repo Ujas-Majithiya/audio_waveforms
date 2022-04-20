@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../base/audio_waveforms_interface.dart';
 
 class PlayerController extends ChangeNotifier {
+
   Uint8List? _bufferData;
 
   ///provides data we got after reading audio file
@@ -20,20 +21,21 @@ class PlayerController extends ChangeNotifier {
 
   String? _audioFilePath;
 
-  ///This stream controller can be used to listen to get current duration of playing
-  ///audio. Events will be sent every 200 milliseconds.
-  ///
-  ///The duration data is in [milliseconds].
-  StreamController<int> durationStreamController = StreamController<int>();
-
-  StreamSubscription? _durationStreamSubscribtion;
-
   int _maxDuration = -1;
 
   ///provides [max] duration of currenly provided audio file.
   int get maxDuration => _maxDuration;
 
   bool _seekToStart = true;
+
+  final UniqueKey _playerKey = UniqueKey();
+
+  String get playerKey => _playerKey.toString();
+
+  PlayerController() {
+    AudioWaveformsInterface.instance
+        .setMethodCallHandler();
+  }
 
   ///Reads bytes from audio file
   Future<void> _readAudioFile(String path) async {
@@ -66,7 +68,7 @@ class PlayerController extends ChangeNotifier {
     if ((_playerState == PlayerState.readingComplete &&
         _audioFilePath != null)) {
       final isPrepared =
-          await AudioWaveformsInterface.instance.preparePlayer(path, volume);
+          await AudioWaveformsInterface.instance.preparePlayer(path, _playerKey.toString(),volume);
       if (isPrepared) {
         _maxDuration = await getDuration();
         _playerState = PlayerState.initialized;
@@ -86,13 +88,10 @@ class PlayerController extends ChangeNotifier {
     if (_playerState == PlayerState.initialized ||
         _playerState == PlayerState.paused) {
       _seekToStart = seekToStart ?? true;
-      final isStarted = await AudioWaveformsInterface.instance
-          .startPlayer(seekToStart ?? true);
+      final isStarted =
+          await AudioWaveformsInterface.instance.startPlayer(_playerKey.toString());
       if (isStarted) {
         _playerState = PlayerState.playing;
-        if (!durationStreamController.hasListener) {
-          _startDurationStream();
-        }
       } else {
         throw "Failed to start player";
       }
@@ -102,8 +101,8 @@ class PlayerController extends ChangeNotifier {
 
   ///Use this to pause the playing audio
   Future<void> pausePlayer() async {
-    _durationStreamSubscribtion?.pause();
-    final isPaused = await AudioWaveformsInterface.instance.pausePlayer();
+    final isPaused =
+        await AudioWaveformsInterface.instance.pausePlayer(_playerKey.toString());
     if (isPaused) {
       _playerState = PlayerState.paused;
     }
@@ -116,9 +115,8 @@ class PlayerController extends ChangeNotifier {
     if (_playerState == PlayerState.initialized ||
         _playerState == PlayerState.paused) {
       final isResumed =
-          await AudioWaveformsInterface.instance.startPlayer(_seekToStart);
+          await AudioWaveformsInterface.instance.startPlayer(_playerKey.toString());
       if (isResumed) {
-        _durationStreamSubscribtion?.resume();
         _playerState = PlayerState.resumed;
       }
     }
@@ -127,8 +125,7 @@ class PlayerController extends ChangeNotifier {
 
   ///Use this to stop player. After calling this, resources are [freed].
   Future<void> stopPlayer() async {
-    await _durationStreamSubscribtion?.cancel();
-    final isStopped = await AudioWaveformsInterface.instance.stopPlayer();
+    final isStopped = await AudioWaveformsInterface.instance.stopPlayer(_playerKey.toString());
     if (isStopped) {
       _playerState = PlayerState.stopped;
     }
@@ -151,7 +148,7 @@ class PlayerController extends ChangeNotifier {
   /// Default is Duration.max
   Future<int> getDuration([DurationType? durationType]) async {
     final duration = await AudioWaveformsInterface.instance
-        .getDuration(durationType?.index ?? 1);
+        .getDuration(_playerKey.toString(), durationType?.index ?? 1);
     return duration ?? -1;
   }
 
@@ -159,26 +156,14 @@ class PlayerController extends ChangeNotifier {
   ///
   /// Minimum Android O is required to use this funtion otherwise nothing happens.
   Future<void> seekTo(int progress) async {
+    if (progress < 0) return;
     if (_playerState == PlayerState.playing ||
         _playerState == PlayerState.resumed) {
-      await AudioWaveformsInterface.instance.seekTo(progress);
+      await AudioWaveformsInterface.instance.seekTo(_playerKey.toString(), progress);
     }
   }
 
-  void _startDurationStream() {
-    _durationStreamSubscribtion = AudioWaveformsInterface.instance
-        .listenToDurationStream()
-        .listen((currentDuration) {
-      if (currentDuration is int) {
-        durationStreamController.add(currentDuration);
-      }
-    });
-    durationStreamController.stream.asBroadcastStream();
-  }
-
   void disposeFunc() async {
-    await durationStreamController.close();
-    _durationStreamSubscribtion?.cancel();
     if (playerState != PlayerState.stopped) await stopPlayer();
     dispose();
   }

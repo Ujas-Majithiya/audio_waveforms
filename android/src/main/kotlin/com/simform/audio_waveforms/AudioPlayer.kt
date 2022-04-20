@@ -2,54 +2,42 @@ package com.simform.audio_waveforms
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.media.MediaPlayer.SEEK_CLOSEST
 import android.media.MediaPlayer.SEEK_PREVIOUS_SYNC
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import androidx.annotation.RequiresApi
-import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.lang.Exception
 
 
-class AudioPlayer : EventChannel.StreamHandler {
+class AudioPlayer(channel: MethodChannel) {
     private val LOG_TAG = "AudioWaveforms"
-    var mediaPlayer: MediaPlayer? = null
-    private var sink: EventChannel.EventSink? = null
     private var handler: Handler = Handler(Looper.getMainLooper())
+    private var mediaPlayers = mutableMapOf<String, MediaPlayer?>()
+    private var runnable = mutableMapOf<String, Runnable?>()
+    private var methodChannel = channel
 
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     fun preparePlayer(
         result: MethodChannel.Result,
         path: String?,
-        volume: Float?
+        volume: Float?,
+        key: String?
     ) {
         //TODO: meta data of song
-        mediaPlayer = MediaPlayer()
-        if (path != null) {
-            mediaPlayer?.setDataSource(path)
-            mediaPlayer?.setAudioAttributes(
+        if (key != null && path != null) {
+            mediaPlayers[key] = MediaPlayer()
+            mediaPlayers[key]?.setDataSource(path)
+            mediaPlayers[key]?.setAudioAttributes(
                 AudioAttributes
                     .Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
             )
-            mediaPlayer?.prepare()
-            mediaPlayer?.setVolume(volume ?: 1F, volume ?: 1F)
-            result.success(true)
-        } else {
-            result.success(false)
-        }
-
-    }
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun seekToPosition(result: MethodChannel.Result, progress: Long?) {
-        if (progress != null) {
-            mediaPlayer?.seekTo(progress, SEEK_PREVIOUS_SYNC)
+            mediaPlayers[key]?.prepare()
+            mediaPlayers[key]?.setVolume(volume ?: 1F, volume ?: 1F)
             result.success(true)
         } else {
             result.success(false)
@@ -57,27 +45,32 @@ class AudioPlayer : EventChannel.StreamHandler {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    fun start(result: MethodChannel.Result, seekToStart: Boolean) {
+    fun seekToPosition(result: MethodChannel.Result, progress: Long?, key: String?) {
+        if (progress != null && key != null) {
+            mediaPlayers[key]?.seekTo(progress, SEEK_PREVIOUS_SYNC)
+            result.success(true)
+        } else {
+            result.success(false)
+        }
+    }
+
+    fun start(result: MethodChannel.Result, seekToStart: Boolean, key: String?) {
+
         try {
-            mediaPlayer?.start()
-            mediaPlayer?.setOnCompletionListener { mp ->
-                run {
-                    sink?.success(mediaPlayer?.duration)
-                    if (seekToStart) mp.seekTo(0, SEEK_PREVIOUS_SYNC)
-                }
-            }
+            mediaPlayers[key]?.start()
             result.success(true)
+            startListening(result, key)
         } catch (e: Exception) {
             result.error(LOG_TAG, "Can not start the player", e.toString())
         }
     }
 
-    fun getDuration(result: MethodChannel.Result, durationType: DurationType) {
+    fun getDuration(result: MethodChannel.Result, durationType: DurationType, key: String?) {
         try {
             if (durationType == DurationType.Current) {
-                result.success(mediaPlayer?.currentPosition)
+                result.success(mediaPlayers[key]?.currentPosition)
             } else {
-                result.success(mediaPlayer?.duration)
+                result.success(mediaPlayers[key]?.duration)
             }
 
         } catch (e: Exception) {
@@ -85,31 +78,39 @@ class AudioPlayer : EventChannel.StreamHandler {
         }
     }
 
-    fun stop(result: MethodChannel.Result) {
-        try {
-            mediaPlayer?.stop()
-            mediaPlayer?.reset()
-            mediaPlayer?.release()
-            result.success(true)
-        } catch (e: Exception) {
-            result.error(LOG_TAG, "Failed to stop the player", e.toString())
+    fun stop(result: MethodChannel.Result, key: String?) {
+        if (key != null) {
+            try {
+                stopListening(result,key)
+                mediaPlayers[key]?.stop()
+                mediaPlayers[key]?.reset()
+                mediaPlayers[key]?.release()
+                result.success(true)
+            } catch (e: Exception) {
+                result.error(LOG_TAG, "Failed to stop the player", e.toString())
+            }
         }
+
     }
 
 
-    fun pause(result: MethodChannel.Result) {
-        try {
-            mediaPlayer?.pause()
-            result.success(true)
-        } catch (e: Exception) {
-            result.error(LOG_TAG, "Failed to pause the player", e.toString())
+    fun pause(result: MethodChannel.Result, key: String?) {
+        if (key != null) {
+            try {
+                stopListening(result,key)
+                mediaPlayers[key]?.pause()
+                result.success(true)
+            } catch (e: Exception) {
+                result.error(LOG_TAG, "Failed to pause the player", e.toString())
+            }
         }
+
     }
 
-    fun setVolume(volume: Float?, result: MethodChannel.Result) {
+    fun setVolume(volume: Float?, result: MethodChannel.Result, key: String?) {
         try {
-            if (volume != null) {
-                mediaPlayer?.setVolume(volume, volume)
+            if (volume != null && key != null) {
+                mediaPlayers[key]?.setVolume(volume, volume)
                 result.success(true)
             } else {
                 result.success(false)
@@ -119,30 +120,31 @@ class AudioPlayer : EventChannel.StreamHandler {
         }
     }
 
-    private val runnable = object : Runnable {
-        override fun run() {
-            if (mediaPlayer?.currentPosition != null) {
-                sink?.success(mediaPlayer?.currentPosition)
-            } else {
-                sink?.error("MediaPlayer", "Can not get duration", "")
+    private fun startListening(result: MethodChannel.Result, key: String?) {
+        if (key != null) {
+            runnable[key] = object : Runnable {
+                override fun run() {
+                    if (mediaPlayers[key]?.currentPosition != null) {
+                        val args: MutableMap<String, Any?> = HashMap()
+                        args[Constants.current] =
+                            mediaPlayers[key]?.currentPosition
+                        args[Constants.playerKey] = key
+                        methodChannel.invokeMethod("onCurrentDuration", args)
+                        handler.postDelayed(this, 200)
+                    } else {
+                        result.error("", "Can't get current Position of player", "")
+                    }
+                }
             }
-            handler.postDelayed(this, 200)
+            handler.post(runnable[key]!!)
         }
+
     }
 
-    private fun startListening() {
-        handler.post(runnable)
-    }
+    private fun continueListening(result: MethodChannel.Result, key: String?){
 
-    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-        sink = events
-        Log.d(LOG_TAG, "Attaching listener")
-        startListening()
     }
-
-    override fun onCancel(arguments: Any?) {
-        sink = null
-        handler.removeCallbacks(runnable)
-        Log.d(LOG_TAG, "cancelling listener")
+    fun stopListening(result: MethodChannel.Result, key: String?) {
+        runnable[key]?.let { handler.removeCallbacks(it) }
     }
 }

@@ -45,11 +45,13 @@ class ChatBubble extends StatelessWidget {
 class WaveBubble extends StatelessWidget {
   final PlayerController playerController;
   final VoidCallback onTap;
+  final bool isSender;
 
   const WaveBubble({
     Key? key,
     required this.playerController,
     required this.onTap,
+    this.isSender = false,
   }) : super(key: key);
 
   @override
@@ -58,23 +60,31 @@ class WaveBubble extends StatelessWidget {
       padding: const EdgeInsets.only(left: 20, bottom: 10, right: 20),
       child: Row(
         children: [
+          if (isSender)...[
+            const Spacer(),
+            IconButton(
+              onPressed: onTap,
+              icon: const Icon(Icons.play_arrow),
+              color: Colors.white,
+            ),
+          ],
           AudioFileWaveforms(
             size: Size(MediaQuery.of(context).size.width / 2, 70),
             decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 color: const Color(0xFF343145)),
-            padding: const EdgeInsets.only(
-                bottom: 9, top: 8, left: 14, right: 12),
+            padding:
+                const EdgeInsets.only(bottom: 9, top: 8, left: 14, right: 12),
             clipBehavior: Clip.hardEdge,
             playerController: playerController,
             density: 1.5,
             playerWaveStyle: const PlayerWaveStyle(
-              showSeeker: false,
-              scaleFactor: 0.8,
-              waveColor: Colors.white,
-              liveWaveColor: Color.fromARGB(221, 59, 50, 173)
-            ),
+                showSeeker: false,
+                scaleFactor: 0.8,
+                waveColor: Colors.white,
+                liveWaveColor: Color.fromARGB(221, 59, 50, 173)),
           ),
+          if (!isSender)
           IconButton(
             onPressed: onTap,
             icon: const Icon(Icons.play_arrow),
