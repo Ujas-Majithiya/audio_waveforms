@@ -1,3 +1,8 @@
+## 1.0.0 (Unreleased)
+
+- **BREAKING**: Replaced `normalizationFactor` with `scaleFactor`and with this fixed [#43](https://github.com/SimformSolutionsPvtLtd/audio_waveforms/issues/43)
+- Updated default values for sample rate and bit rate.
+
 ## 0.1.5+1
 
 - Added missing import.
