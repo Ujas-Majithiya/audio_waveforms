@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:audio_waveforms/audio_waveforms.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+// TODO: change bundle identifier
 void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
@@ -65,12 +67,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       ..androidEncoder = AndroidEncoder.aac
       ..androidOutputFormat = AndroidOutputFormat.mpeg4
       ..iosEncoder = IosEncoder.kAudioFormatMPEG4AAC
-      ..sampleRate = 16000
-      ..bitRate = 64000;
+      ..sampleRate = 44100
+      ..bitRate = 48000;
     playerController1 = PlayerController()
       ..addListener(() {
         if (mounted) setState(() {});
       });
+
     playerController2 = PlayerController()
       ..addListener(() {
         if (mounted) setState(() {});
@@ -98,32 +101,32 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final file1 = File('${appDirectory.path}/audio1.mp3');
     await file1.writeAsBytes(
         (await _loadAsset('assets/audios/audio1.mp3')).buffer.asUint8List());
-    playerController1.preparePlayer(file1.path);
+    await playerController1.preparePlayer(path: file1.path);
 
     ///audio-2
     final file2 = File('${appDirectory.path}/audio2.mp3');
     await file2.writeAsBytes(
         (await _loadAsset('assets/audios/audio2.mp3')).buffer.asUint8List());
-    playerController2.preparePlayer(file2.path);
+    //playerController2.preparePlayer(path: file2.path);
 
     ///audio-3
     final file3 = File('${appDirectory.path}/audio3.mp3');
     await file3.writeAsBytes(
         (await _loadAsset('assets/audios/audio3.mp3')).buffer.asUint8List());
-    playerController3.preparePlayer(file3.path);
+    //playerController3.preparePlayer(path: file3.path);
 
     ///audio-4
     final file4 = File('${appDirectory.path}/audio4.mp3');
     await file4.writeAsBytes(
         (await _loadAsset('assets/audios/audio4.mp3')).buffer.asUint8List());
-    playerController4.preparePlayer(file4.path);
+    // playerController4.preparePlayer(path: file4.path);
   }
 
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
     if (result != null) {
       musicFile = result.files.single.path;
-      await playerController6.preparePlayer(musicFile!);
+      await playerController6.preparePlayer(path: musicFile!);
     } else {
       debugPrint("File not picked");
     }
@@ -237,7 +240,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                     child: isRecording
                         ? AudioWaveforms(
                             enableGesture: true,
-                            size: Size(MediaQuery.of(context).size.width / 2, 50),
+                            size:
+                                Size(MediaQuery.of(context).size.width / 2, 50),
                             recorderController: recorderController,
                             waveStyle: const WaveStyle(
                               waveColor: Colors.white,
@@ -264,7 +268,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                               readOnly: true,
                               decoration: InputDecoration(
                                 hintText: "Type Something...",
-                                hintStyle: const TextStyle(color: Colors.white54),
+                                hintStyle:
+                                    const TextStyle(color: Colors.white54),
                                 contentPadding: const EdgeInsets.only(top: 16),
                                 border: InputBorder.none,
                                 suffixIcon: IconButton(
@@ -312,7 +317,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
       if (path != null) {
         debugPrint("Recorded file size: ${File(path).lengthSync()}");
-        await playerController5.preparePlayer(path);
+        debugPrint(path);
+        await playerController5.preparePlayer(path: path);
       }
     } else {
       await recorderController.record(path);

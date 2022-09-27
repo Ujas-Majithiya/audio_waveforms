@@ -7,6 +7,8 @@ class PlayerWaveStyle {
   ///Color of the [live] wave which indicates currently played part.
   final Color liveWaveColor;
 
+  final double spacing;
+
   ///Whether to show seeker or not
   //TODO: fix seek line
   // final bool showSeeker;
@@ -39,7 +41,7 @@ class PlayerWaveStyle {
   final Shader? fixedWavegradient;
 
   /// This is applied to each wave while generating.
-  /// Use this to [scale] the waves. Defaults to 1.0.
+  /// Use this to [scale] the waves. Defaults to 100.0.
   final double scaleFactor;
 
   /// This gradient is applied to waves which indicates currently played part.
@@ -60,8 +62,17 @@ class PlayerWaveStyle {
     this.waveThickness = 3.0,
     this.backgroundColor = Colors.black,
     this.fixedWavegradient,
-    this.scaleFactor = 1.0,
+    this.scaleFactor = 100.0,
     this.liveWaveGradient,
     this.visualizerHeight = 28.0,
-  });
+    this.spacing = 5,
+  }) : assert(waveThickness < spacing,
+            "waveThickness can't be greater than spacing");
+
+  /// Determines number of samples which will fit in provided width.
+  /// Returned number of samples are also dependent on [spacing] set for
+  /// this constructor.
+  int getSamplesForWidth(double width) {
+    return width ~/ spacing;
+  }
 }

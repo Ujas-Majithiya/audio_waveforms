@@ -38,7 +38,7 @@ class _AudioWaveformsState extends State<AudioWaveforms> {
   Offset _totalBackDistance = Offset.zero;
   Offset _dragOffset = Offset.zero;
 
-  double _initialOffsetPosition = 0.0;
+  double _initialDragPosition = 0.0;
   double _initialPosition = 0.0;
 
   @override
@@ -123,7 +123,7 @@ class _AudioWaveformsState extends State<AudioWaveforms> {
 
   ///This handles scrolling of the wave
   void _handleHorizontalDragUpdate(DragUpdateDetails details) {
-    var direction = details.globalPosition.dx - _initialOffsetPosition;
+    var direction = details.globalPosition.dx - _initialDragPosition;
     widget.recorderController.setRefresh(false);
     _isScrolled = true;
 
@@ -148,7 +148,7 @@ class _AudioWaveformsState extends State<AudioWaveforms> {
 
   ///This will help-out to determine to get direction of the scroll
   void _handleHorizontalDragStart(DragStartDetails details) {
-    _initialOffsetPosition = details.globalPosition.dx;
+    _initialDragPosition = details.globalPosition.dx;
   }
 
   ///This will handle pushing back the wave when it reaches to middle/end of the
@@ -169,7 +169,7 @@ class _AudioWaveformsState extends State<AudioWaveforms> {
           _totalBackDistance + Offset(widget.waveStyle.spacing, 0.0);
     }
     if (widget.recorderController.shouldClearLabels) {
-      _initialOffsetPosition = 0.0;
+      _initialDragPosition = 0.0;
       _totalBackDistance = Offset.zero;
       _dragOffset = Offset.zero;
     }

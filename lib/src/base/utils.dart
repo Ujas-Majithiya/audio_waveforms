@@ -92,9 +92,6 @@ enum IosEncoder {
 
 /// States of audio player
 enum PlayerState {
-  /// When reading of an audio file is completed
-  readingComplete,
-
   /// When player is [initialised]
   initialized,
 
@@ -141,3 +138,25 @@ enum FinishMode {
   ///Stops player and disposes it(a PlayerController won't be disposed).
   stop
 }
+
+/// An enum to decide which type of gestures will be used when
+/// enableSeekGesture is set to true for AudioFileWaveforms.
+enum SeekGestureType {
+  /// This gesture will allow seeking with dragging and also tap.
+  /// This gesture will be more useful when there are limited number of bars
+  /// and they don't exceed the screen.
+  seekAndTap,
+
+  // TODO: better docs
+  /// This gesture will allow seeking with only tap but now waveforms tap
+  /// position will co-relate to time position in the audio also when
+  /// waveforms are dragged they will move along with drag on x-axis.
+  /// This gesture will be more useful when there are greater number of bars
+  /// and they exceed the screen.
+  scrollAndTap,
+
+  /// Seek gestures are disabled.
+  none
+}
+
+enum ExtractionState { unInitialised ,completed, inProgress }
